@@ -147,7 +147,7 @@ function padPath(s) { return '/pad.ps3'; }
 
 function ping(path) {
   const ctl = new AbortController();
-  const t = setTimeout(() => ctl.abort(), 700);
+  const t = setTimeout(() => ctl.abort(), 2000);
   return fetch(base + path, { mode: 'no-cors', cache: 'no-store', keepalive: false, signal: ctl.signal })
     .then(() => { dot.style.background = '#22c55e'; return true; })
     .catch(() => { dot.style.background = '#ef4444'; return false; })
@@ -184,8 +184,8 @@ function send() {
   inflight = true;
   ping(url).then(ok => {
     inflight = false;
-    if (ok) { held = holdMode ? target : ''; lastTx = Date.now(); }
-    send();                                                           // chain immediately
+    if (ok) { held = holdMode ? target : ''; lastTx = Date.now(); send(); } // chain immediately
+    // on failure: no instant retry (it flooded the PS3); the 50ms timer retries with the latest state
   });
 }
 
@@ -196,6 +196,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) relea
 window.addEventListener('pagehide', () => { releaseAll(); releaseSlot(); });
 
 function backToSetup(text) {
+  stopAuto();
   releaseAll(); releaseSlot();
   pad.querySelectorAll('.on').forEach(n => n.classList.remove('on'));
   pad.style.display = 'none'; base = ''; slot = 0;
@@ -205,36 +206,67 @@ function backToSetup(text) {
   refreshSlots();
 }
 
-document.getElementById('connect').onclick = async () => {
-  const ip = ipInput.value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
-  if (!ip) { msg.textContent = 'Enter the IP first'; return; }
-  await refreshSlots();
-  if (!slot) { msg.textContent = 'اختار رقم اللاعب الأول'; return; }
-  if (!(await claimSlot())) { msg.textContent = 'اللاعب ' + slot + ' مشغول، اختار مكان تاني'; slot = 0; refreshSlots(); return; }
-  claimed = slot;
-  base = 'http://' + ip;
-  holdMode = document.getElementById('holdmode').checked; held = '';
-  try { localStorage.setItem('ps3_hold', holdMode ? '1' : '0'); localStorage.setItem('ps3_ip', ip); } catch (e) {}
-  msg.textContent = 'Connecting…';
-  fetch(base + '/popup.ps3/' + encodeURIComponent('Player ' + slot + ' connected'), { mode: 'no-cors', cache: 'no-store' })
-    .then(() => {
-      dot.style.background = '#22c55e';
-      pnum.textContent = 'P' + slot;
-      document.getElementById('setup').style.display = 'none';
-      pad.style.display = 'block';
-      document.body.classList.add('live');
-      const de = document.documentElement;
-      if (de.requestFullscreen) de.requestFullscreen().then(() => {
-        if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
-      }).catch(() => {});
-    })
-    .catch(() => {
+let autoOn = true, autoTimer = null, busyConn = false;
+function stopAuto() { autoOn = false; clearTimeout(autoTimer); }
+
+// returns 'ok' | 'fail' (PS3 not reachable yet, worth retrying) | 'stop' (needs the user)
+async function connectNow(auto) {
+  if (busyConn) return 'stop';
+  busyConn = true;
+  try {
+    const ip = ipInput.value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+    if (!ip) { msg.textContent = 'Enter the IP first'; return 'stop'; }
+    await refreshSlots();
+    if (!slot) { msg.textContent = 'اختار رقم اللاعب الأول'; return 'stop'; }
+    if (!(await claimSlot())) {
+      msg.textContent = 'اللاعب ' + slot + ' مشغول، اختار مكان تاني';
+      slot = 0; refreshSlots(); return 'stop';
+    }
+    claimed = slot;
+    base = 'http://' + ip;
+    holdMode = document.getElementById('holdmode').checked; held = '';
+    try {
+      localStorage.setItem('ps3_hold', holdMode ? '1' : '0');
+      localStorage.setItem('ps3_ip', ip);
+      localStorage.setItem('ps3_slot', String(slot));
+    } catch (e) {}
+    msg.textContent = auto ? 'جاري الاتصال بالـPS3…' : 'Connecting…';
+    const ctl = new AbortController();
+    const t = setTimeout(() => ctl.abort(), 2500);
+    try {
+      await fetch(base + '/popup.ps3/' + encodeURIComponent('Player ' + slot + ' connected'),
+        { mode: 'no-cors', cache: 'no-store', signal: ctl.signal });
+    } catch (e) {
       dot.style.background = '#ef4444';
       releaseSlot(); base = '';
-      msg.textContent = 'Could not reach the PS3. Check the IP, the Wi-Fi, and that webMAN MOD is running.';
+      msg.textContent = auto
+        ? 'مستني الـPS3 (شغّل HEN وwebMAN)… بحاول تاني'
+        : 'Could not reach the PS3. Check the IP, the Wi-Fi, and that webMAN MOD is running.';
       refreshSlots();
-    });
-};
+      return 'fail';
+    } finally { clearTimeout(t); }
+
+    dot.style.background = '#22c55e';
+    pnum.textContent = 'P' + slot;
+    document.getElementById('setup').style.display = 'none';
+    pad.style.display = 'block';
+    document.body.classList.add('live');
+    const de = document.documentElement;
+    if (de.requestFullscreen) de.requestFullscreen().then(() => {
+      if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+    }).catch(() => {});
+    return 'ok';
+  } finally { busyConn = false; }
+}
+
+async function autoLoop() {
+  if (!autoOn) return;
+  const r = await connectNow(true);
+  if (r === 'fail' && autoOn) autoTimer = setTimeout(autoLoop, 3000);
+}
+
+document.getElementById('connect').onclick = () => { stopAuto(); connectNow(false); };
+ipInput.addEventListener('input', stopAuto);
 
 function hold(el, name) {
   const set = down => {
@@ -325,6 +357,10 @@ function makeStick(prefix, x, y) {
 }
 makeStick('analogL', 30, 76);
 makeStick('analogR', 67, 76);
+
+// auto-connect on launch using the last saved IP and player
+try { slot = +localStorage.getItem('ps3_slot') || 0; } catch (e) {}
+if (ipInput.value.trim() && slot) { renderSlots(); autoLoop(); } else { autoOn = false; }
 </script>
 </body>
 </html>

@@ -5,19 +5,12 @@ pluginManagement {
         gradlePluginPortal()
     }
 }
-
-plugins {
-    id 'com.android.application' version '8.5.2' apply false
-    id 'com.android.library' version '8.5.2' apply false
-}
-
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
     repositories {
         google()
         mavenCentral()
     }
 }
-
-rootProject.name = "song"
-include ":app"
+rootProject.name = "PS3Pad"
+include ':app'
