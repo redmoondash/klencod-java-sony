@@ -22,6 +22,8 @@
   .slot.taken { opacity:.4; border-color:#7f1d1d; }
   .slot.taken small { color:#f87171; }
 
+  #keymap { color:#9aa0aa; font-size:13px; text-align:center; max-width:360px; line-height:1.7; }
+
   #rotate { position:fixed; inset:0; z-index:15; display:none; align-items:center; justify-content:center; background:var(--bg); color:#9aa0aa; text-align:center; padding:24px; }
   @media (orientation:portrait) { body.live #rotate { display:flex; } }
 
@@ -63,6 +65,10 @@
   <div id="slots"></div>
   <button class="go" id="connect">Connect</button>
   <label style="display:flex;gap:8px;align-items:center;color:#9aa0aa;font-size:15px;touch-action:auto"><input type="checkbox" id="holdmode" checked style="width:auto;padding:0;touch-action:auto"> Smooth mode (hold)</label>
+  <div id="keymap">
+    الكيبورد: الأسهم = D-pad · J/K/U/I = X/O/□/△ · Enter = Start · Right Shift = Select<br>
+    Q/E = L1/R1 · Z/C = L2/R2 · Home = PS
+  </div>
   <div id="msg"></div>
 </div>
 
@@ -81,11 +87,11 @@ const slotsEl = document.getElementById('slots');
 try { ipInput.value = localStorage.getItem('ps3_ip') || ''; document.getElementById('holdmode').checked = localStorage.getItem('ps3_hold') !== '0'; } catch (e) {}
 
 // ---------- player slots ----------
-const CID = Math.random().toString(36).slice(2, 10);   // unique id for this phone
-let slot = 0;            // chosen player 1..4
-let claimed = 0;         // slot we actually hold
-let taken = {};          // {1:id|null,...} from server
-let serverOk = false;    // false when the page isn't served by server.js
+const CID = Math.random().toString(36).slice(2, 10);
+let slot = 0;
+let claimed = 0;
+let taken = {};
+let serverOk = false;
 
 async function api(p, opts) {
   try { return await fetch(p, Object.assign({ cache: 'no-store' }, opts)); } catch (e) { return null; }
@@ -107,14 +113,14 @@ function renderSlots() {
 async function refreshSlots() {
   const r = await api('/slots');
   if (r && r.ok) { try { taken = await r.json(); serverOk = true; } catch (e) { serverOk = false; } } else serverOk = false;
-  if (slot && serverOk && taken[slot] && taken[slot] !== CID) slot = 0; // someone took it meanwhile
+  if (slot && serverOk && taken[slot] && taken[slot] !== CID) slot = 0;
   if (document.getElementById('setup').style.display !== 'none') renderSlots();
 }
 renderSlots(); refreshSlots();
 setInterval(() => { if (!claimed) refreshSlots(); }, 2000);
 
 async function claimSlot() {
-  if (!serverOk) return true;                       // no server: can't check, allow
+  if (!serverOk) return true;
   const r = await api('/claim?slot=' + slot + '&id=' + CID, { method: 'POST' });
   return !!(r && r.ok);
 }
@@ -136,13 +142,11 @@ let base = '';
 let inflight = false, held = '', lastTx = 0;
 let holdMode = true;
 const pressed = new Set();
-const pending = new Set(); // presses that must reach the PS3 even if released very quickly
-let psQueued = false;      // PS button tap waiting to be sent
-const MINHOLD = 90;        // ms a button stays held on the PS3 (raise to 120-150 if a game still misses taps)
-const downAt = {};         // name -> time of last press
+const pending = new Set();
+let psQueued = false;
+const MINHOLD = 90;
+const downAt = {};
 
-// URL path per player. NOTE: webMAN's pad.ps3 may only drive player 1;
-// if your build supports other players, change it here (one place).
 function padPath(s) { return '/pad.ps3'; }
 
 function ping(path) {
@@ -154,11 +158,8 @@ function ping(path) {
     .finally(() => clearTimeout(t));
 }
 
-// Only one request at a time (the PS3 chokes on parallel ones), but the next one
-// fires the moment the previous finishes, with the LATEST state, so no lag builds up.
 function send() {
   if (!base || inflight) return;
-  // buttons stay "down" for at least MINHOLD ms so games (which poll the pad) don't miss quick taps
   const names = new Set([...pressed, ...pending]);
   const now = Date.now();
   for (const n in downAt) {
@@ -175,7 +176,7 @@ function send() {
   let url = null, target = cur;
   if (holdMode) {
     if (cur !== held) url = cur ? P + '?hold_' + cur : P + '?release';
-    else if (cur && now - lastTx > 800) url = P + '?hold_' + cur;      // keep-alive
+    else if (cur && now - lastTx > 800) url = P + '?hold_' + cur;
   } else if (cur) {
     url = P + '?' + cur;
   }
@@ -184,8 +185,7 @@ function send() {
   inflight = true;
   ping(url).then(ok => {
     inflight = false;
-    if (ok) { held = holdMode ? target : ''; lastTx = Date.now(); send(); } // chain immediately
-    // on failure: no instant retry (it flooded the PS3); the 50ms timer retries with the latest state
+    if (ok) { held = holdMode ? target : ''; lastTx = Date.now(); send(); }
   });
 }
 
@@ -209,7 +209,6 @@ function backToSetup(text) {
 let autoOn = true, autoTimer = null, busyConn = false;
 function stopAuto() { autoOn = false; clearTimeout(autoTimer); }
 
-// returns 'ok' | 'fail' (PS3 not reachable yet, worth retrying) | 'stop' (needs the user)
 async function connectNow(auto) {
   if (busyConn) return 'stop';
   busyConn = true;
@@ -269,6 +268,7 @@ document.getElementById('connect').onclick = () => { stopAuto(); connectNow(fals
 ipInput.addEventListener('input', stopAuto);
 
 function hold(el, name) {
+  el.dataset.name = name;
   const set = down => {
     if (down === el.classList.contains('on')) return;
     el.classList.toggle('on', down);
@@ -320,7 +320,8 @@ const dp = add('dpad', 13, 42, '<div class="glow"></div>');
     dp.appendChild(k); hold(k, name);
   });
 
-const psb = add('ps', 48.5, 78, 'P');   // PS button: sent as a plain /pad.ps3?psbtn tap, not hold_
+const psb = add('ps', 48.5, 78, 'P');
+psb.dataset.name = 'PS';
 psb.addEventListener('pointerdown', () => { psb.classList.add('on'); psQueued = true; if (navigator.vibrate) navigator.vibrate(5); send(); });
 ['pointerup', 'pointercancel'].forEach(t => psb.addEventListener(t, () => psb.classList.remove('on')));
 const wr = add('', 48.5, 91, '<div id="wrench">&#128295;</div>');
@@ -348,7 +349,7 @@ function makeStick(prefix, x, y) {
       SECT[i].forEach(n => pressed.add(prefix + '_' + n));
       key = i;
     }
-    if (key !== lastKey) { lastKey = key; send(); }   // only when direction actually changes
+    if (key !== lastKey) { lastKey = key; send(); }
   };
   const end = () => { isActive = false; lastKey = ''; k.style.transform = ''; clear(); send(); };
   s.addEventListener('pointerdown', e => { isActive = true; s.setPointerCapture(e.pointerId); move(e); });
@@ -357,6 +358,98 @@ function makeStick(prefix, x, y) {
 }
 makeStick('analogL', 30, 76);
 makeStick('analogR', 67, 76);
+
+// ---------- keyboard + physical gamepad ----------
+const KEYMAP = {
+  ArrowUp: 'up', ArrowDown: 'down', ArrowLeft: 'left', ArrowRight: 'right',
+  KeyJ: 'cross', KeyK: 'circle', KeyU: 'square', KeyI: 'triangle',
+  Enter: 'start', ShiftRight: 'select',
+  KeyQ: 'l1', KeyE: 'r1', KeyZ: 'l2', KeyC: 'r2',
+  Home: 'PS'
+};
+const kbCodes = new Set();
+const kbNames = new Set();
+const gpNames = new Set();
+
+function setVisual(name, on) {
+  const el = pad.querySelector('[data-name="' + name + '"]');
+  if (el) el.classList.toggle('on', on);
+}
+
+// يحسب الحالة النهائية للزرار من المصدرين (كيبورد + جويستيك)
+function syncName(n) {
+  const want = kbNames.has(n) || gpNames.has(n);
+  if (want && !pressed.has(n)) {
+    pressed.add(n); pending.add(n); downAt[n] = Date.now();
+    if (navigator.vibrate) navigator.vibrate(5);
+    setVisual(n, true);
+  } else if (!want && pressed.has(n)) {
+    pressed.delete(n); setVisual(n, false);
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (!base || e.target.tagName === 'INPUT') return;
+  const n = KEYMAP[e.code];
+  if (!n) return;
+  e.preventDefault();
+  if (kbCodes.has(e.code)) return;
+  kbCodes.add(e.code);
+  if (n === 'PS') { psQueued = true; send(); return; }
+  kbNames.add(n); syncName(n); send();
+});
+
+document.addEventListener('keyup', e => {
+  const n = KEYMAP[e.code];
+  if (!n) return;
+  kbCodes.delete(e.code);
+  if (n === 'PS') return;
+  kbNames.delete(n); syncName(n); send();
+});
+
+window.addEventListener('blur', () => {
+  kbCodes.clear(); kbNames.clear(); gpNames.clear();
+  releaseAll();
+  pad.querySelectorAll('.on').forEach(n => n.classList.remove('on'));
+});
+
+// ---- Gamepad (DualShock / Xbox) ----
+const GPMAP = { 0: 'cross', 1: 'circle', 2: 'square', 3: 'triangle',
+  4: 'l1', 5: 'r1', 6: 'l2', 7: 'r2', 8: 'select', 9: 'start',
+  12: 'up', 13: 'down', 14: 'left', 15: 'right' };
+const PS_BUTTON = 16;
+let psPrevGp = false;
+
+function pollGamepad() {
+  if (!base || !navigator.getGamepads) return;
+  const gp = [...navigator.getGamepads()].find(Boolean);
+  if (!gp) return;
+
+  const now = new Set();
+  gp.buttons.forEach((b, i) => {
+    if (b.pressed && GPMAP[i]) now.add(GPMAP[i]);
+  });
+  const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;
+  if (ax < -0.5) now.add('left');
+  if (ax >  0.5) now.add('right');
+  if (ay < -0.5) now.add('up');
+  if (ay >  0.5) now.add('down');
+
+  // تحديث الحالة: اللي اتضغط يتضاف، واللي اتفك يتشال
+  const all = new Set([...Object.values(GPMAP), 'up', 'down', 'left', 'right']);
+  all.forEach(n => {
+    const want = now.has(n);
+    if (want) gpNames.add(n); else gpNames.delete(n);
+    syncName(n);
+  });
+  send();
+
+  // زرار PS (index 16) بيتبعت كضغطة واحدة
+  const psNow = !!(gp.buttons[PS_BUTTON] && gp.buttons[PS_BUTTON].pressed);
+  if (psNow && !psPrevGp) { psQueued = true; send(); }
+  psPrevGp = psNow;
+}
+setInterval(pollGamepad, 16);
 
 // auto-connect on launch using the last saved IP and player
 try { slot = +localStorage.getItem('ps3_slot') || 0; } catch (e) {}
