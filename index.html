@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>PS3 Controller</title>
+<style>
+  :root { --bg:#101010; --key:#3a3a3d; --key2:#1b1b1d; --ink:#f2f2f2; --accent:#facc15; }
+  * { box-sizing:border-box; touch-action:none; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--ink); font:600 16px system-ui,sans-serif; overflow:hidden; }
+
+  #setup { position:fixed; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:var(--bg); z-index:20; padding:24px; }
+  #setup input[type=text] { width:min(320px,90vw); padding:14px; font-size:18px; border-radius:12px; border:1px solid #333; background:#1c1c1e; color:var(--ink); text-align:center; touch-action:auto; user-select:text; }
+  button.go { padding:14px 36px; font-size:18px; border:0; border-radius:12px; background:#3b82f6; color:#fff; font-weight:600; }
+  #credit { position:absolute; top:calc(env(safe-area-inset-top) + 16px); right:18px; color:#9aa0aa; font-size:15px; font-weight:600; }
+  #msg { min-height:1.4em; color:#9aa0aa; text-align:center; max-width:320px; }
+
+  #slots { display:flex; gap:10px; }
+  .slot { width:68px; padding:12px 0; border-radius:12px; border:2px solid #333; background:#1c1c1e; color:var(--ink); font-size:15px; font-weight:700; text-align:center; }
+  .slot small { display:block; font-size:11px; font-weight:500; color:#9aa0aa; margin-top:2px; }
+  .slot.sel { border-color:var(--accent); background:#2a2610; }
+  .slot.taken { opacity:.4; border-color:#7f1d1d; }
+  .slot.taken small { color:#f87171; }
+
+  #rotate { position:fixed; inset:0; z-index:15; display:none; align-items:center; justify-content:center; background:var(--bg); color:#9aa0aa; text-align:center; padding:24px; }
+  @media (orientation:portrait) { body.live #rotate { display:flex; } }
+
+  #pad { position:fixed; inset:0; display:none; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  .c { position:absolute; transform:translate(-50%,-50%); }
+  .btn { display:flex; align-items:center; justify-content:center; border-radius:50%; color:var(--ink); background:radial-gradient(circle at 35% 30%, #4a4a4e, var(--key) 55%, var(--key2)); box-shadow:0 0 0 2px #0a0a0a, inset 0 1px 2px rgba(255,255,255,.12); font-size:2.6vh; }
+  .btn.on { filter:brightness(1.7); box-shadow:0 0 0 2px var(--accent), 0 0 14px rgba(250,204,21,.45); }
+  .trig { width:15vh; height:15vh; }
+  .shoulder { width:15vh; height:15vh; }
+  .small { width:11vh; height:11vh; font-size:1.9vh; }
+  .face { width:16vh; height:16vh; }
+  .face svg { width:55%; height:55%; fill:none; stroke-width:7; stroke-linecap:round; stroke-linejoin:round; }
+
+  .dpad { width:40vh; height:40vh; border-radius:50%; background:radial-gradient(circle, #26262a 55%, #1a1a1d); }
+  .dpad .glow { position:absolute; left:50%; top:50%; width:5vh; height:5vh; margin:-2.5vh; border-radius:50%; background:radial-gradient(circle, #fde047 10%, rgba(250,204,21,0) 70%); pointer-events:none; }
+  .dk { position:absolute; transform:translate(-50%,-50%); background:linear-gradient(145deg,#4a4a4e,#2a2a2d); box-shadow:0 0 0 2px #0a0a0a, inset 0 1px 2px rgba(255,255,255,.14); }
+  .dk.on { background:linear-gradient(145deg,#8a8a90,#55555a); box-shadow:0 0 0 2px var(--accent); }
+
+  .pad-touch { width:18%; height:26%; background-image:radial-gradient(circle, #3b3b40 1.6px, transparent 2px); background-size:2.2vh 2.2vh; border-radius:4px; opacity:.8; pointer-events:none; }
+
+  .stick { width:36vh; height:36vh; border-radius:50%; background:conic-gradient(from 210deg, #ffb347, #ff4fa0, #d946ef, #7c6cf0, #38bdf8, #22e1ff, #ffb347); box-shadow:0 0 18px rgba(217,70,239,.25); }
+  .stick .well { position:absolute; inset:18%; border-radius:50%; background:radial-gradient(circle, #0c0c0e 40%, rgba(12,12,14,0) 100%); }
+  .stick i { position:absolute; left:50%; top:50%; width:46%; height:46%; margin:-23%; border-radius:50%; background:radial-gradient(circle at 40% 35%, #4b4b50, #131315 70%); box-shadow:0 0 0 3px #26262a, inset 0 0 0 3px #3a3a3f, 0 6px 10px rgba(0,0,0,.6); }
+
+  .ps { width:12vh; height:12vh; display:flex; align-items:center; justify-content:center; font-size:5.5vh; font-weight:800; color:#cfcfd3; border-radius:50%; background:radial-gradient(circle at 35% 30%, #3a3a3e, #1b1b1d); box-shadow:0 0 0 2px #0a0a0a; }
+  .ps.on { color:#fff; text-shadow:0 0 12px #60a5fa; }
+  #wrench { width:7vh; height:7vh; display:flex; align-items:center; justify-content:center; font-size:4.4vh; opacity:.8; }
+  #dot { position:fixed; left:50%; bottom:4vh; width:10px; height:10px; border-radius:50%; background:#6b7280; transform:translateX(-50%); z-index:5; }
+  #pnum { position:fixed; left:50%; top:calc(env(safe-area-inset-top) + 8px); transform:translateX(-50%); z-index:5; color:var(--accent); font-size:14px; display:none; }
+  body.live #pnum { display:block; }
+</style>
+</head>
+<body>
+
+<div id="setup">
+  <div id="credit">by daniel atef</div>
+  <h2 style="margin:0">PS3 IP</h2>
+  <input type="text" id="ip" inputmode="decimal" placeholder="192.168.1.50" autocomplete="off">
+  <div id="slots"></div>
+  <button class="go" id="connect">Connect</button>
+  <label style="display:flex;gap:8px;align-items:center;color:#9aa0aa;font-size:15px;touch-action:auto"><input type="checkbox" id="holdmode" checked style="width:auto;padding:0;touch-action:auto"> Smooth mode (hold)</label>
+  <div id="msg"></div>
+</div>
+
+<div id="rotate">Rotate your phone to landscape</div>
+<div id="dot"></div>
+<div id="pnum"></div>
+<div id="pad"></div>
+
+<script>
+const ipInput = document.getElementById('ip');
+const pad = document.getElementById('pad');
+const msg = document.getElementById('msg');
+const dot = document.getElementById('dot');
+const pnum = document.getElementById('pnum');
+const slotsEl = document.getElementById('slots');
+try { ipInput.value = localStorage.getItem('ps3_ip') || ''; document.getElementById('holdmode').checked = localStorage.getItem('ps3_hold') !== '0'; } catch (e) {}
+
+// ---------- player slots ----------
+const CID = Math.random().toString(36).slice(2, 10);   // unique id for this phone
+let slot = 0;            // chosen player 1..4
+let claimed = 0;         // slot we actually hold
+let taken = {};          // {1:id|null,...} from server
+let serverOk = false;    // false when the page isn't served by server.js
+
+async function api(p, opts) {
+  try { return await fetch(p, Object.assign({ cache: 'no-store' }, opts)); } catch (e) { return null; }
+}
+function renderSlots() {
+  slotsEl.innerHTML = '';
+  for (let i = 1; i <= 4; i++) {
+    const busy = serverOk && taken[i] && taken[i] !== CID;
+    const b = document.createElement('button');
+    b.className = 'slot' + (slot === i ? ' sel' : '') + (busy ? ' taken' : '');
+    b.innerHTML = 'P' + i + '<small>' + (busy ? 'مشغول' : 'متاح') + '</small>';
+    b.onclick = () => {
+      if (busy) { msg.textContent = 'اللاعب ' + i + ' مشغول، اختار مكان تاني'; return; }
+      slot = i; msg.textContent = ''; renderSlots();
+    };
+    slotsEl.appendChild(b);
+  }
+}
+async function refreshSlots() {
+  const r = await api('/slots');
+  if (r && r.ok) { try { taken = await r.json(); serverOk = true; } catch (e) { serverOk = false; } } else serverOk = false;
+  if (slot && serverOk && taken[slot] && taken[slot] !== CID) slot = 0; // someone took it meanwhile
+  if (document.getElementById('setup').style.display !== 'none') renderSlots();
+}
+renderSlots(); refreshSlots();
+setInterval(() => { if (!claimed) refreshSlots(); }, 2000);
+
+async function claimSlot() {
+  if (!serverOk) return true;                       // no server: can't check, allow
+  const r = await api('/claim?slot=' + slot + '&id=' + CID, { method: 'POST' });
+  return !!(r && r.ok);
+}
+function releaseSlot() {
+  if (claimed && serverOk) {
+    const u = '/release?slot=' + claimed + '&id=' + CID;
+    if (navigator.sendBeacon) navigator.sendBeacon(u); else api(u, { method: 'POST' });
+  }
+  claimed = 0;
+}
+setInterval(async () => {
+  if (!claimed || !serverOk) return;
+  const r = await api('/beat?slot=' + claimed + '&id=' + CID, { method: 'POST' });
+  if (r && r.status === 409) backToSetup('اتفصلت: المكان اتاخد من حد تاني');
+}, 2000);
+
+// ---------- sending to the PS3 ----------
+let base = '';
+let inflight = false, held = '', lastTx = 0;
+let holdMode = true;
+const pressed = new Set();
+const pending = new Set(); // presses that must reach the PS3 even if released very quickly
+let psQueued = false;      // PS button tap waiting to be sent
+const MINHOLD = 90;        // ms a button stays held on the PS3 (raise to 120-150 if a game still misses taps)
+const downAt = {};         // name -> time of last press
+
+// URL path per player. NOTE: webMAN's pad.ps3 may only drive player 1;
+// if your build supports other players, change it here (one place).
+function padPath(s) { return '/pad.ps3'; }
+
+function ping(path) {
+  const ctl = new AbortController();
+  const t = setTimeout(() => ctl.abort(), 700);
+  return fetch(base + path, { mode: 'no-cors', cache: 'no-store', keepalive: false, signal: ctl.signal })
+    .then(() => { dot.style.background = '#22c55e'; return true; })
+    .catch(() => { dot.style.background = '#ef4444'; return false; })
+    .finally(() => clearTimeout(t));
+}
+
+// Only one request at a time (the PS3 chokes on parallel ones), but the next one
+// fires the moment the previous finishes, with the LATEST state, so no lag builds up.
+function send() {
+  if (!base || inflight) return;
+  // buttons stay "down" for at least MINHOLD ms so games (which poll the pad) don't miss quick taps
+  const names = new Set([...pressed, ...pending]);
+  const now = Date.now();
+  for (const n in downAt) {
+    if (pressed.has(n)) continue;
+    if (now - downAt[n] < MINHOLD) names.add(n); else delete downAt[n];
+  }
+  const cur = [...names].sort().join('_');
+  const P = padPath(slot);
+  if (psQueued) {
+    psQueued = false; inflight = true;
+    ping(P + '?psbtn').then(() => { inflight = false; send(); });
+    return;
+  }
+  let url = null, target = cur;
+  if (holdMode) {
+    if (cur !== held) url = cur ? P + '?hold_' + cur : P + '?release';
+    else if (cur && now - lastTx > 800) url = P + '?hold_' + cur;      // keep-alive
+  } else if (cur) {
+    url = P + '?' + cur;
+  }
+  if (!url) return;
+  pending.clear();
+  inflight = true;
+  ping(url).then(ok => {
+    inflight = false;
+    if (ok) { held = holdMode ? target : ''; lastTx = Date.now(); }
+    send();                                                           // chain immediately
+  });
+}
+
+setInterval(send, 50);
+
+function releaseAll() { pressed.clear(); pending.clear(); send(); }
+document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
+window.addEventListener('pagehide', () => { releaseAll(); releaseSlot(); });
+
+function backToSetup(text) {
+  releaseAll(); releaseSlot();
+  pad.querySelectorAll('.on').forEach(n => n.classList.remove('on'));
+  pad.style.display = 'none'; base = ''; slot = 0;
+  document.body.classList.remove('live');
+  document.getElementById('setup').style.display = 'flex';
+  msg.textContent = text || '';
+  refreshSlots();
+}
+
+document.getElementById('connect').onclick = async () => {
+  const ip = ipInput.value.trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+  if (!ip) { msg.textContent = 'Enter the IP first'; return; }
+  await refreshSlots();
+  if (!slot) { msg.textContent = 'اختار رقم اللاعب الأول'; return; }
+  if (!(await claimSlot())) { msg.textContent = 'اللاعب ' + slot + ' مشغول، اختار مكان تاني'; slot = 0; refreshSlots(); return; }
+  claimed = slot;
+  base = 'http://' + ip;
+  holdMode = document.getElementById('holdmode').checked; held = '';
+  try { localStorage.setItem('ps3_hold', holdMode ? '1' : '0'); localStorage.setItem('ps3_ip', ip); } catch (e) {}
+  msg.textContent = 'Connecting…';
+  fetch(base + '/popup.ps3/' + encodeURIComponent('Player ' + slot + ' connected'), { mode: 'no-cors', cache: 'no-store' })
+    .then(() => {
+      dot.style.background = '#22c55e';
+      pnum.textContent = 'P' + slot;
+      document.getElementById('setup').style.display = 'none';
+      pad.style.display = 'block';
+      document.body.classList.add('live');
+      const de = document.documentElement;
+      if (de.requestFullscreen) de.requestFullscreen().then(() => {
+        if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {});
+      }).catch(() => {});
+    })
+    .catch(() => {
+      dot.style.background = '#ef4444';
+      releaseSlot(); base = '';
+      msg.textContent = 'Could not reach the PS3. Check the IP, the Wi-Fi, and that webMAN MOD is running.';
+      refreshSlots();
+    });
+};
+
+function hold(el, name) {
+  const set = down => {
+    if (down === el.classList.contains('on')) return;
+    el.classList.toggle('on', down);
+    down ? pressed.add(name) : pressed.delete(name);
+    if (down) { pending.add(name); downAt[name] = Date.now(); if (navigator.vibrate) navigator.vibrate(5); }
+    send();
+  };
+  el.addEventListener('pointerdown', e => { el.setPointerCapture(e.pointerId); set(true); });
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(t => el.addEventListener(t, () => set(false)));
+}
+
+function place(el, x, y) { el.style.left = x + '%'; el.style.top = y + '%'; }
+
+function add(cls, x, y, html, name) {
+  const b = document.createElement('div');
+  b.className = 'c ' + cls; b.innerHTML = html || '';
+  place(b, x, y); pad.appendChild(b);
+  if (name) hold(b, name);
+  return b;
+}
+
+const SH = {
+  triangle: '<svg viewBox="0 0 64 64" stroke="#3fc1c9"><path d="M32 12 L54 50 H10 Z"/></svg>',
+  square:   '<svg viewBox="0 0 64 64" stroke="#d9a0e8"><rect x="12" y="12" width="40" height="40"/></svg>',
+  circle:   '<svg viewBox="0 0 64 64" stroke="#ec7a86"><circle cx="32" cy="32" r="21"/></svg>',
+  cross:    '<svg viewBox="0 0 64 64" stroke="#7fa8f0"><path d="M14 14 L50 50 M50 14 L14 50"/></svg>',
+};
+
+add('btn trig', 5, 11, 'LT', 'l2');
+add('btn trig', 95, 11, 'RT', 'r2');
+add('btn shoulder', 33, 36, 'LB', 'l1');
+add('btn shoulder', 64, 37, 'RB', 'r1');
+
+add('pad-touch', 49, 24, '');
+add('btn small', 43, 46, 'SHARE', 'select');
+add('btn small', 52.5, 46, 'OPTIONS', 'start');
+
+add('btn face', 85.5, 26, SH.triangle, 'triangle');
+add('btn face', 76.5, 42, SH.square, 'square');
+add('btn face', 94, 44, SH.circle, 'circle');
+add('btn face', 85.5, 61, SH.cross, 'cross');
+
+const dp = add('dpad', 13, 42, '<div class="glow"></div>');
+[['up', 50, 27, 26, 28, '14px 14px 6px 6px'], ['down', 50, 73, 26, 28, '6px 6px 14px 14px'],
+ ['left', 27, 50, 28, 26, '14px 6px 6px 14px'], ['right', 73, 50, 28, 26, '6px 14px 14px 6px']]
+  .forEach(([name, x, y, w, h, r]) => {
+    const k = document.createElement('div');
+    k.className = 'dk'; k.style.cssText = `left:${x}%;top:${y}%;width:${w}%;height:${h}%;border-radius:${r}`;
+    dp.appendChild(k); hold(k, name);
+  });
+
+const psb = add('ps', 48.5, 78, 'P');   // PS button: sent as a plain /pad.ps3?psbtn tap, not hold_
+psb.addEventListener('pointerdown', () => { psb.classList.add('on'); psQueued = true; if (navigator.vibrate) navigator.vibrate(5); send(); });
+['pointerup', 'pointercancel'].forEach(t => psb.addEventListener(t, () => psb.classList.remove('on')));
+const wr = add('', 48.5, 91, '<div id="wrench">&#128295;</div>');
+wr.addEventListener('click', () => backToSetup(''));
+
+function makeStick(prefix, x, y) {
+  const s = add('stick', x, y, '<div class="well"></div>');
+  const k = document.createElement('i'); s.appendChild(k);
+  const T = 0.35; let isActive = false, lastKey = '';
+  const dirs = ['up', 'down', 'left', 'right'].map(d => prefix + '_' + d);
+  const SECT = [['right'], ['down', 'right'], ['down'], ['down', 'left'], ['left'], ['up', 'left'], ['up'], ['up', 'right']];
+  const clear = () => dirs.forEach(d => pressed.delete(d));
+  const move = e => {
+    const r = s.getBoundingClientRect();
+    const R = r.width * 0.27;
+    let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+    const d = Math.hypot(dx, dy);
+    const mag = d / R;
+    if (d > R) { dx *= R / d; dy *= R / d; }
+    k.style.transform = `translate(${dx}px,${dy}px)`;
+    clear();
+    let key = '';
+    if (mag > T) {
+      const i = (Math.round(Math.atan2(dy, dx) / (Math.PI / 4)) + 8) % 8;
+      SECT[i].forEach(n => pressed.add(prefix + '_' + n));
+      key = i;
+    }
+    if (key !== lastKey) { lastKey = key; send(); }   // only when direction actually changes
+  };
+  const end = () => { isActive = false; lastKey = ''; k.style.transform = ''; clear(); send(); };
+  s.addEventListener('pointerdown', e => { isActive = true; s.setPointerCapture(e.pointerId); move(e); });
+  s.addEventListener('pointermove', e => isActive && move(e));
+  ['pointerup', 'pointercancel'].forEach(t => s.addEventListener(t, end));
+}
+makeStick('analogL', 30, 76);
+makeStick('analogR', 67, 76);
+</script>
+</body>
+</html>
