@@ -27,28 +27,28 @@
   #rotate { position:fixed; inset:0; z-index:15; display:none; align-items:center; justify-content:center; background:var(--bg); color:#9aa0aa; text-align:center; padding:24px; }
   @media (orientation:portrait) { body.live #rotate { display:flex; } }
 
-  #pad { position:fixed; inset:0; display:none; padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+  #pad { position:fixed; inset:0; display:none; padding:0; }
   .c { position:absolute; transform:translate(-50%,-50%); }
-  .btn { display:flex; align-items:center; justify-content:center; border-radius:50%; color:var(--ink); background:radial-gradient(circle at 35% 30%, #4a4a4e, var(--key) 55%, var(--key2)); box-shadow:0 0 0 2px #0a0a0a, inset 0 1px 2px rgba(255,255,255,.12); font-size:2.6vh; }
+  .btn { display:flex; align-items:center; justify-content:center; border-radius:50%; color:var(--ink); background:radial-gradient(circle at 35% 30%, #4a4a4e, var(--key) 55%, var(--key2)); box-shadow:0 0 0 3px #0a0a0a, inset 0 1px 3px rgba(255,255,255,.15); font-size:2.6vh; }
   .btn.on { filter:brightness(1.7); box-shadow:0 0 0 2px var(--accent), 0 0 14px rgba(250,204,21,.45); }
-  .trig { width:15vh; height:15vh; }
-  .shoulder { width:15vh; height:15vh; }
-  .small { width:11vh; height:11vh; font-size:1.9vh; }
-  .face { width:16vh; height:16vh; }
+  .trig { width:18vh; height:18vh; }
+  .shoulder { width:18vh; height:18vh; }
+  .small { width:14vh; height:14vh; font-size:2.2vh; }
+  .face { width:20vh; height:20vh; }
   .face svg { width:55%; height:55%; fill:none; stroke-width:7; stroke-linecap:round; stroke-linejoin:round; }
 
-  .dpad { width:40vh; height:40vh; border-radius:50%; background:radial-gradient(circle, #26262a 55%, #1a1a1d); }
+  .dpad { width:46vh; height:46vh; border-radius:50%; background:radial-gradient(circle, #26262a 55%, #1a1a1d); }
   .dpad .glow { position:absolute; left:50%; top:50%; width:5vh; height:5vh; margin:-2.5vh; border-radius:50%; background:radial-gradient(circle, #fde047 10%, rgba(250,204,21,0) 70%); pointer-events:none; }
   .dk { position:absolute; transform:translate(-50%,-50%); background:linear-gradient(145deg,#4a4a4e,#2a2a2d); box-shadow:0 0 0 2px #0a0a0a, inset 0 1px 2px rgba(255,255,255,.14); }
   .dk.on { background:linear-gradient(145deg,#8a8a90,#55555a); box-shadow:0 0 0 2px var(--accent); }
 
   .pad-touch { width:18%; height:26%; background-image:radial-gradient(circle, #3b3b40 1.6px, transparent 2px); background-size:2.2vh 2.2vh; border-radius:4px; opacity:.8; pointer-events:none; }
 
-  .stick { width:36vh; height:36vh; border-radius:50%; background:conic-gradient(from 210deg, #ffb347, #ff4fa0, #d946ef, #7c6cf0, #38bdf8, #22e1ff, #ffb347); box-shadow:0 0 18px rgba(217,70,239,.25); }
+  .stick { width:42vh; height:42vh; border-radius:50%; background:conic-gradient(from 210deg, #ffb347, #ff4fa0, #d946ef, #7c6cf0, #38bdf8, #22e1ff, #ffb347); box-shadow:0 0 18px rgba(217,70,239,.25); }
   .stick .well { position:absolute; inset:18%; border-radius:50%; background:radial-gradient(circle, #0c0c0e 40%, rgba(12,12,14,0) 100%); }
   .stick i { position:absolute; left:50%; top:50%; width:46%; height:46%; margin:-23%; border-radius:50%; background:radial-gradient(circle at 40% 35%, #4b4b50, #131315 70%); box-shadow:0 0 0 3px #26262a, inset 0 0 0 3px #3a3a3f, 0 6px 10px rgba(0,0,0,.6); }
 
-  .ps { width:12vh; height:12vh; display:flex; align-items:center; justify-content:center; font-size:5.5vh; font-weight:800; color:#cfcfd3; border-radius:50%; background:radial-gradient(circle at 35% 30%, #3a3a3e, #1b1b1d); box-shadow:0 0 0 2px #0a0a0a; }
+  .ps { width:15vh; height:15vh; display:flex; align-items:center; justify-content:center; font-size:6.5vh; font-weight:800; color:#cfcfd3; border-radius:50%; background:radial-gradient(circle at 35% 30%, #3a3a3e, #1b1b1d); box-shadow:0 0 0 2px #0a0a0a; }
   .ps.on { color:#fff; text-shadow:0 0 12px #60a5fa; }
   #wrench { width:7vh; height:7vh; display:flex; align-items:center; justify-content:center; font-size:4.4vh; opacity:.8; }
   #dot { position:fixed; left:50%; bottom:4vh; width:10px; height:10px; border-radius:50%; background:#6b7280; transform:translateX(-50%); z-index:5; }
@@ -144,7 +144,7 @@ let holdMode = true;
 const pressed = new Set();
 const pending = new Set();
 let psQueued = false;
-const MINHOLD = 90;
+const MINHOLD = 120;   // ms: من 90 لـ120 عشان الألعاب ما تفوتش الضغطات القصيرة
 const downAt = {};
 
 function padPath(s) { return '/pad.ps3'; }
@@ -189,7 +189,7 @@ function send() {
   });
 }
 
-setInterval(send, 50);
+setInterval(send, 30);   // من 50 لـ30
 
 function releaseAll() { pressed.clear(); pending.clear(); send(); }
 document.addEventListener('visibilitychange', () => { if (document.hidden) releaseAll(); });
@@ -376,7 +376,6 @@ function setVisual(name, on) {
   if (el) el.classList.toggle('on', on);
 }
 
-// يحسب الحالة النهائية للزرار من المصدرين (كيبورد + جويستيك)
 function syncName(n) {
   const want = kbNames.has(n) || gpNames.has(n);
   if (want && !pressed.has(n)) {
@@ -435,7 +434,6 @@ function pollGamepad() {
   if (ay < -0.5) now.add('up');
   if (ay >  0.5) now.add('down');
 
-  // تحديث الحالة: اللي اتضغط يتضاف، واللي اتفك يتشال
   const all = new Set([...Object.values(GPMAP), 'up', 'down', 'left', 'right']);
   all.forEach(n => {
     const want = now.has(n);
@@ -444,12 +442,11 @@ function pollGamepad() {
   });
   send();
 
-  // زرار PS (index 16) بيتبعت كضغطة واحدة
   const psNow = !!(gp.buttons[PS_BUTTON] && gp.buttons[PS_BUTTON].pressed);
   if (psNow && !psPrevGp) { psQueued = true; send(); }
   psPrevGp = psNow;
 }
-setInterval(pollGamepad, 16);
+setInterval(pollGamepad, 8);   // من 16 لـ8
 
 // auto-connect on launch using the last saved IP and player
 try { slot = +localStorage.getItem('ps3_slot') || 0; } catch (e) {}
